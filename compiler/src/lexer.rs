@@ -29,6 +29,7 @@ pub enum Token {
 
     Colon,
     DoubleColon,
+    Comma,
     Semicolon,
 
     Equal,
@@ -173,6 +174,7 @@ pub fn tokenize(source: &str) -> LexerResult {
             }
 
             // PUNCTUATION
+            ',' => Some(Token::Comma),
             ':' => {
                 if chars.peek() == Some(&':'){
                     chars.next();

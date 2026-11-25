@@ -69,12 +69,11 @@ fn analyze_statement(
                 location.column,
             );
         }
-        Statement::Print {
-            value,
-            ..
-        } => {
-            self.analyze_expression(value);
-        }
+        Statement::Print { values, .. } => {
+    for value in values {
+        self.analyze_expression(value);
+    }
+}
         Statement::Block {
             statements,
             ..
@@ -161,6 +160,7 @@ fn analyze_expression(
         Expression::Number(_)
         | Expression::StringLiteral(_)
         | Expression::Boolean(_) => {}
+        | Expression::Input {..}=> {}
     }
 }
     pub fn new() -> Self {

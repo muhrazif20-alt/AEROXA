@@ -99,6 +99,12 @@ pub enum Instruction {
     Print{
         value:ValueId,
         data_type:IrType,
+        newline:bool,
+    },
+    Input{
+        result: ValueId,
+        prompt:String,
+        data_type:IrType,
     },
 }
 

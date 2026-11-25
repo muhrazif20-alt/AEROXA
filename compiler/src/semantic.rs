@@ -31,9 +31,26 @@ fn analyze_statement(
         }=>{
             //MODULE WI BE HANDLEDBY THE MODULE RESOLVER
         }
-        Statement::Print { value, location } => {
-            analyze_expression(value, symbols, diagnostics, location);
-        }
+        Statement::Print { values, location } => {
+    if values.is_empty() {
+        diagnostics.push(Diagnostic::error(
+            "AX035",
+            "Print requires at least one argument.",
+            location.line,
+            location.column,
+        ));
+        return;
+    }
+
+    for value in values {
+        analyze_expression(
+            value,
+            symbols,
+            diagnostics,
+            location,
+        );
+    }
+}
 
         Statement::VariableDeclaration {
             name,
@@ -303,6 +320,8 @@ fn analyze_expression(
         Expression::Boolean(_) => Some("Bool".to_string()),
 
         Expression::StringLiteral(_) => Some("String".to_string()),
+
+        Expression::Input {..} => Some("String".to_string()),
 
         Expression::Variable(name) => {
             match symbols.lookup(name) {

@@ -24,11 +24,99 @@ use diagnostics::has_errors;
 use parser::Parser;
 use progress::Progress;
 
+// AEROXA native input runtime.
+const AEROXA_RUNTIME_C: &str = r#"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <errno.h>
+#include <limits.h>
+
+char *aeroxa_input_string(const char *prompt) {
+    fputs(prompt, stdout);
+    fflush(stdout);
+
+    char *buffer = (char *)malloc(4096);
+
+    if (buffer == NULL) {
+        fputs("AEROXA runtime: out of memory\n", stderr);
+        exit(1);
+    }
+
+    if (fgets(buffer, 4096, stdin) == NULL) {
+        buffer[0] = '\0';
+        return buffer;
+    }
+
+    size_t length = strlen(buffer);
+
+    if (length > 0 && buffer[length - 1] == '\n') {
+        buffer[--length] = '\0';
+    } else if (!feof(stdin)) {
+        int character;
+
+        while ((character = getchar()) != '\n' && character != EOF) {
+        }
+    }
+
+    if (length > 0 && buffer[length - 1] == '\r') {
+        buffer[--length] = '\0';
+    }
+
+    return buffer;
+}
+
+int32_t aeroxa_input_i32(const char *prompt) {
+    char buffer[128];
+
+    fputs(prompt, stdout);
+    fflush(stdout);
+
+    if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+        fputs("AEROXA runtime: input error\n", stderr);
+        return 0;
+    }
+
+    if (strchr(buffer, '\n') == NULL && !feof(stdin)) {
+        int character;
+
+        while ((character = getchar()) != '\n' && character != EOF) {
+        }
+    }
+
+    errno = 0;
+
+    char *end = NULL;
+    long value = strtol(buffer, &end, 10);
+
+    while (end != NULL &&
+           (*end == ' ' || *end == '\t' ||
+            *end == '\r' || *end == '\n')) {
+        end++;
+    }
+
+    if (end == buffer ||
+        (end != NULL && *end != '\0') ||
+        errno == ERANGE ||
+        value < INT32_MIN ||
+        value > INT32_MAX) {
+
+        fputs("AEROXA runtime: invalid Int32 input\n", stderr);
+        return 0;
+    }
+
+    return (int32_t)value;
+}
+"#;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("Usage: aeroxa <file.ex> [--compile-only] [--debug-tokens]");
+        eprintln!(
+            "Usage: aeroxa <file.ex> [--compile-only] [--debug-tokens]"
+        );
         return;
     }
 
@@ -90,7 +178,11 @@ fn main() {
 
     // SOURCE FINGERPRINT
     let mut fingerprint_hasher = DefaultHasher::new();
+
     source.hash(&mut fingerprint_hasher);
+
+    // Invalidate older cached executables when runtime changes.
+    "AEROXA_INPUT_RUNTIME_V1".hash(&mut fingerprint_hasher);
 
     let fingerprint = format!("{:016x}", fingerprint_hasher.finish());
 
@@ -112,6 +204,8 @@ fn main() {
 
     let llvm_path = source_build_dir.join(file_name).with_extension("ll");
     let executable_path = source_build_dir.join(file_name).with_extension("exe");
+    let runtime_path = source_build_dir.join("aeroxa_runtime.c");
+
     let cache_path = cache_dir.join(format!("{}.cache", source_id));
 
     // INCREMENTAL COMPILATION CACHE
@@ -134,7 +228,6 @@ fn main() {
     // START COMPILER TIMER
     let compiler_start = Instant::now();
 
-    // CINEMATIC PROGRESS
     let mut progress = Progress::new(7);
 
     // STAGE 1: LEXER
@@ -142,7 +235,6 @@ fn main() {
 
     let lexical = tokenize(&source);
 
-    // OPTIONAL TOKEN DEBUG
     if debug_tokens {
         println!("\n========== TOKEN DEBUG ==========");
 
@@ -212,10 +304,7 @@ fn main() {
 
     // MERGE MODULE AST
     for module in modules {
-        println!(
-            "[MODULE] Integrating: {}",
-            module.name
-        );
+        println!("[MODULE] Integrating: {}", module.name);
 
         program
             .statements
@@ -300,6 +389,12 @@ fn main() {
         compiler_start.elapsed().as_secs_f64() * 1000.0
     );
 
+    // WRITE C RUNTIME
+    if let Err(error) = fs::write(&runtime_path, AEROXA_RUNTIME_C) {
+        eprintln!("Cannot write AEROXA runtime: {}", error);
+        return;
+    }
+
     // STAGE 7: NATIVE COMPILATION
     let clang_start = Instant::now();
 
@@ -307,6 +402,7 @@ fn main() {
 
     let compilation = Command::new("clang")
         .arg(&llvm_path)
+        .arg(&runtime_path)
         .arg("-O2")
         .arg("-o")
         .arg(&executable_path)
@@ -323,6 +419,7 @@ fn main() {
                 return;
             }
         }
+
         Err(error) => {
             progress.failed("NATIVE COMPILATION");
             eprintln!("Cannot execute Clang: {}", error);
@@ -360,19 +457,17 @@ fn main() {
     run_executable(&executable_path);
 }
 
-// EXECUTE NATIVE PROGRAM
+// EXECUTE NATIVE PROGRAM INTERACTIVELY
 fn run_executable(executable_path: &Path) {
-    let execution = Command::new(executable_path).output();
+    let execution = Command::new(executable_path).status();
 
     match execution {
-        Ok(result) => {
-            print!("{}", String::from_utf8_lossy(&result.stdout));
-
-            if !result.status.success() {
-                eprintln!("Program execution failed.");
-                eprintln!("{}", String::from_utf8_lossy(&result.stderr));
+        Ok(status) => {
+            if !status.success() {
+                eprintln!("Program execution failed: {}", status);
             }
         }
+
         Err(error) => {
             eprintln!("Cannot execute AEROXA program: {}", error);
         }

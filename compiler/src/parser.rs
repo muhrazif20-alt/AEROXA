@@ -76,11 +76,21 @@ impl Parser {
             return None;
         }
 
-        let value = self.parse_expression()?;
+        let mut values = Vec::new();
+
+        // Parse argument pertama.
+        values.push(self.parse_expression()?);
+
+        // Parse argument berikutnya jika ada koma.
+        while *self.current() == Token::Comma {
+            self.advance();
+
+            values.push(self.parse_expression()?);
+        }
 
         if !self.expect(
             Token::RightParen,
-            "Expected ')' after print expression.",
+            "Expected ')' after print arguments.",
         ) {
             return None;
         }
@@ -93,7 +103,7 @@ impl Parser {
         }
 
         Some(Statement::Print {
-            value,
+            values,
             location,
         })
     }
@@ -127,7 +137,39 @@ impl Parser {
 
         self.parse_variable(true)
     }
+// ==========================================
+// INPUT
+// ==========================================
 
+fn parse_input(&mut self) -> Option<Expression> {
+    if !self.expect(
+        Token::LeftParen,
+        "Expected '(' after input.",
+    ) {
+        return None;
+    }
+
+    let prompt = match self.advance() {
+        Token::StringLiteral(value) => value,
+        _ => {
+            self.report_error(
+                "Expected string prompt inside input()."
+            );
+            return None;
+        }
+    };
+
+    if !self.expect(
+        Token::RightParen,
+        "Expected ')' after input prompt.",
+    ) {
+        return None;
+    }
+
+    Some(Expression::Input {
+        prompt,
+    })
+}
     // ==========================================
     // EXPRESSIONS
     // ==========================================
@@ -145,7 +187,9 @@ impl Parser {
             Token::StringLiteral(value) => {
                 Some(Expression::StringLiteral(value))
             }
-
+            Token::Identifier(name) if name == "input"=>{
+                self.parse_input()
+            }
             Token::Identifier(name) => {
                 Some(Expression::Variable(name))
             }

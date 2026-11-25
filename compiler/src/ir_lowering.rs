@@ -37,10 +37,8 @@ impl LoweringContext {
         Self {
             next_value: 0,
             next_block: 1,
-
             instructions: Vec::new(),
             blocks: Vec::new(),
-
             current_block: BlockId(0),
             variables: HashMap::new(),
         }
@@ -58,32 +56,32 @@ impl LoweringContext {
         id
     }
 
-    fn terminate_current(
-        &mut self,
-        terminator: Terminator,
-    ) {
+    fn terminate_current(&mut self, terminator: Terminator) {
         let block = BasicBlock {
             id: self.current_block,
-            instructions: std::mem::take(
-                &mut self.instructions
-            ),
+            instructions: std::mem::take(&mut self.instructions),
             terminator: Some(terminator),
         };
 
         self.blocks.push(block);
     }
 
+    // ==============================================
+    // STATEMENT LOWERING
+    // ==============================================
+
     fn lower_statement(
         &mut self,
         statement: &Statement,
     ) -> Result<(), String> {
         match statement {
-            Statement::Link{
-                module:_,
-                location:_,
-            }=>{
-                //MODULE declaration do not generate runtime instruction
+            Statement::Link {
+                module: _,
+                location: _,
+            } => {
+                // Module declarations do not generate runtime instructions.
             }
+
             Statement::VariableDeclaration {
                 name,
                 data_type,
@@ -94,7 +92,10 @@ impl LoweringContext {
                 let declared_type = parse_type(data_type)?;
 
                 let (value_id, value_type) =
-                    self.lower_expression(value)?;
+                    self.lower_expression_expected(
+                        value,
+                        Some(declared_type.clone()),
+                    )?;
 
                 if declared_type != value_type {
                     return Err(format!(
@@ -151,25 +152,24 @@ impl LoweringContext {
                 );
             }
 
-            Statement::Print {
-                value,
-                ..
-            } => {
-                let (value_id, value_type) =
-                    self.lower_expression(value)?;
+           Statement::Print { values, .. } => {
+    let total = values.len();
 
-                self.instructions.push(
-                    Instruction::Print {
-                        value: value_id,
-                        data_type: value_type,
-                    },
-                );
-            }
+    for (index, value) in values.iter().enumerate() {
+        let (value_id, value_type) =
+            self.lower_expression(value)?;
 
-            Statement::Block {
-                statements,
-                ..
-            } => {
+        self.instructions.push(
+            Instruction::Print {
+                value: value_id,
+                data_type: value_type,
+                newline: index == total - 1,
+            },
+        );
+    }
+}
+
+            Statement::Block { statements, .. } => {
                 for statement in statements {
                     self.lower_statement(statement)?;
                 }
@@ -180,25 +180,21 @@ impl LoweringContext {
                 otherwise,
                 ..
             } => {
-                self.lower_conditional(
-                    branches,
-                    otherwise,
-                )?;
+                self.lower_conditional(branches, otherwise)?;
             }
-            Statement::Loop{
+
+            Statement::Loop {
                 condition,
                 statements,
                 ..
-            }=>{
-                self.lower_loop(
-                    condition,
-                    statements,
-                )?;
+            } => {
+                self.lower_loop(condition, statements)?;
             }
         }
 
         Ok(())
     }
+
     // ==============================================
     // LOOP LOWERING
     // ==============================================
@@ -208,31 +204,25 @@ impl LoweringContext {
         condition: &Expression,
         statements: &[Statement],
     ) -> Result<(), String> {
-
-        // Create loop blocks.
         let condition_block = self.new_block();
         let body_block = self.new_block();
         let exit_block = self.new_block();
 
-        // Enter condition block.
         self.terminate_current(
             Terminator::Jump(condition_block),
         );
 
         self.current_block = condition_block;
 
-        // Evaluate loop condition.
         let (condition_id, condition_type) =
             self.lower_expression(condition)?;
 
         if condition_type != IrType::Bool {
             return Err(
-                "Loop condition must have Bool type."
-                    .to_string()
+                "Loop condition must have Bool type.".to_string()
             );
         }
 
-        // Branch to body or exit.
         self.terminate_current(
             Terminator::Branch {
                 condition: condition_id,
@@ -241,23 +231,21 @@ impl LoweringContext {
             },
         );
 
-        // Lower loop body.
         self.current_block = body_block;
 
         for statement in statements {
             self.lower_statement(statement)?;
         }
 
-        // Return to condition block.
         self.terminate_current(
             Terminator::Jump(condition_block),
         );
 
-        // Continue after loop.
         self.current_block = exit_block;
 
         Ok(())
     }
+
     // ==============================================
     // CONDITIONAL LOWERING
     // ==============================================
@@ -274,7 +262,6 @@ impl LoweringContext {
         let merge_block = self.new_block();
 
         for (index, branch) in branches.iter().enumerate() {
-            // Lower condition expression.
             let (condition_id, condition_type) =
                 self.lower_expression(&branch.condition)?;
 
@@ -285,13 +272,11 @@ impl LoweringContext {
                 );
             }
 
-            // Create then block.
             let then_block = self.new_block();
 
-            // Determine false branch destination.
             let has_next_branch =
                 index + 1 < branches.len()
-                || otherwise.is_some();
+                    || otherwise.is_some();
 
             let else_block = if has_next_branch {
                 self.new_block()
@@ -299,7 +284,6 @@ impl LoweringContext {
                 merge_block
             };
 
-            // Create conditional branch.
             self.terminate_current(
                 Terminator::Branch {
                     condition: condition_id,
@@ -308,23 +292,19 @@ impl LoweringContext {
                 },
             );
 
-            // Lower check/orcheck body.
             self.current_block = then_block;
 
             for statement in &branch.statements {
                 self.lower_statement(statement)?;
             }
 
-            // Connect branch body to merge.
             self.terminate_current(
                 Terminator::Jump(merge_block),
             );
 
-            // Continue with the next condition.
             self.current_block = else_block;
         }
 
-        // Lower #else$ body.
         if let Some(statements) = otherwise {
             for statement in statements {
                 self.lower_statement(statement)?;
@@ -335,7 +315,6 @@ impl LoweringContext {
             );
         }
 
-        // Continue after conditional.
         self.current_block = merge_block;
 
         Ok(())
@@ -348,6 +327,14 @@ impl LoweringContext {
     fn lower_expression(
         &mut self,
         expression: &Expression,
+    ) -> Result<(ValueId, IrType), String> {
+        self.lower_expression_expected(expression, None)
+    }
+
+    fn lower_expression_expected(
+        &mut self,
+        expression: &Expression,
+        expected_type: Option<IrType>,
     ) -> Result<(ValueId, IrType), String> {
         match expression {
             Expression::Number(number) => {
@@ -394,6 +381,34 @@ impl LoweringContext {
                 );
 
                 Ok((result, IrType::String))
+            }
+
+            Expression::Input { prompt } => {
+                let data_type = expected_type.ok_or_else(|| {
+                    "input() must initialize a typed variable."
+                        .to_string()
+                })?;
+
+                if data_type != IrType::String
+                    && data_type != IrType::Int32
+                {
+                    return Err(
+                        "input() supports String and Int32 only."
+                            .to_string()
+                    );
+                }
+
+                let result = self.new_value();
+
+                self.instructions.push(
+                    Instruction::Input {
+                        result,
+                        prompt: prompt.clone(),
+                        data_type: data_type.clone(),
+                    },
+                );
+
+                Ok((result, data_type))
             }
 
             Expression::Boolean(value) => {
@@ -606,7 +621,6 @@ pub fn lower_program(
         context.lower_statement(statement)?;
     }
 
-    // Finish the final block.
     context.terminate_current(
         Terminator::Return(None),
     );

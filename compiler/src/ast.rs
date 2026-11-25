@@ -28,7 +28,7 @@ pub enum Statement {
     },
 
     Print {
-        value: Expression,
+        values: Vec<Expression>,
         location: SourceLocation,
     },
 
@@ -63,6 +63,10 @@ pub enum Expression {
     StringLiteral(String),
     Boolean(bool),
     Variable(String),
+
+    Input {
+        prompt: String,
+    },
 
     Binary {
         left: Box<Expression>,
