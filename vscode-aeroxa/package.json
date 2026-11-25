@@ -1,0 +1,39 @@
+{
+  "name":"aeroxa-language",
+  "displayName":"Aeroxa Language Support",
+  "description":"Aeroxa syntax highlighting and language icons",
+  "version":"0.3.0.",
+  "publisher":"aeroxa",
+  "engines":{
+    "vscode":"1.80.0"
+  },
+  "catrgories":[
+    "Programming Language",
+  ],
+  "contributes";{
+    "languages":[
+      {
+        "id":"aeroxa",
+        "aliases":[
+          "AEROXA",
+          "aeroxa"
+        ],
+        "extension":[
+          ".ex"
+        ],
+        "configuration":"./language-configuration.json",
+        "icon":{
+          "light":"./icons/aeroxa.png",
+          "dark":"./icons/aeroxa.png",
+        }
+      }
+    ],
+    "grammars":[
+      {
+        "language":"aeroxa",
+        "scopeName":"source.aeroxs",
+        "path":"./syntaxes/aeroxa.tmLanguage.json"
+      }
+    ]
+  }
+}

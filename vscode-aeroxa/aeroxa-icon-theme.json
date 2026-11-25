@@ -1,0 +1,10 @@
+{
+  "iconDefinitions": {
+    "_aeroxa": {
+      "iconPath": "./icons/aeroxa-file-icon.ico"
+    }
+  },
+  "fileExtensions": {
+    "ex": "_aeroxa"
+  }
+}

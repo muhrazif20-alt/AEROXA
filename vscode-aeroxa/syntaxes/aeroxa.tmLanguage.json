@@ -1,0 +1,48 @@
+{
+  "scopeName": "source.aeroxa",
+  "patterns": [
+    {
+      "name": "comment.line.double-slash.aeroxa",
+      "match": "//.*$"
+    },
+    {
+      "name": "keyword.declaration.aeroxa",
+      "match": "\\b(let|mut|fn)\\b"
+    },
+    {
+      "name": "storage.type.aeroxa",
+      "match": "\\b(Int8|Int16|Int32|Int64|Float32|Float64|String|Bool)\\b"
+    },
+    {
+      "name": "entity.name.annotation.aeroxa",
+      "match": "@[A-Za-z_][A-Za-z0-9_]*"
+    },
+    {
+      "name": "constant.numeric.aeroxa",
+      "match": "\\b[0-9]+(\\.[0-9]+)?\\b"
+    },
+    {
+      "name": "string.quoted.double.aeroxa",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.aeroxa",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.operator.aeroxa",
+      "match": "->|[=+*/%-]"
+    },
+    {
+      "name": "punctuation.separator.aeroxa",
+      "match": "[;:,]"
+    },
+    {
+      "name": "punctuation.section.block.aeroxa",
+      "match": "[{}()]"
+    }
+  ]
+}

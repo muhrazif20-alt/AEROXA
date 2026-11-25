@@ -1,0 +1,8 @@
+[package]
+name = "Aeroxa"
+version = "0.1.0"
+edition =  "2024"
+description = "AEROXA Strict Universal Programming Language Compiler"
+authors =["AEROXA Development Team"]
+
+[dependencies]

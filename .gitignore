@@ -1,0 +1,25 @@
+@"
+# Rust build
+target/
+**/target/
+
+# AEROXA generated files
+trash/
+build/
+*.exe
+*.dll
+*.pdb
+*.ll
+
+# Temporary files
+benchmark/temporary/
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+"@ | Set-Content .gitignore
