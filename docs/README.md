@@ -3,6 +3,7 @@ AEROXA
 Strict Universal Programming Language
 
 CODE BEYOND LIMITS
+**AEROXA v0.0.0**
 
 AEROXA adalah bahasa pemrograman yang sedang dikembangkan menggunakan Rust, dengan fokus pada strict typing, compile-time validation, ownership-based safety, dan native compilation melalui LLVM.
 
